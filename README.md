@@ -1,10 +1,6 @@
 
 ---
 
-# 2024 - Auraware
-
----
-
 # Inventory System API
 
 This project is an API for managing product inventories. It allows adding, editing, deleting products, and retrieving products by category or all products. The API is built using Express and uses Supabase as the database.
