@@ -1,0 +1,238 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Cycle Counts
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/09-cycle-counts/requirements.md. Implemented. Paths
+    are scoped under /api/v1 per docs/conventions/api-design.md.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/cycle-counts:
+    get:
+      tags: [CycleCounts]
+      summary: List cycle count sessions.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/CycleCountStatus' }
+      responses:
+        '200':
+          description: Paginated list of cycle count sessions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountPage' }
+    post:
+      tags: [CycleCounts]
+      summary: Create an OPEN cycle count session. productIds omitted counts every product with stock at the warehouse (FULL); provided, only those (SELECTION).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCycleCountRequest' }
+      responses:
+        '201':
+          description: Cycle count created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountResponse' }
+        '409':
+          description: WAREHOUSE_INACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown warehouseId/productId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/cycle-counts/{cycleCountId}:
+    parameters:
+      - $ref: '#/components/parameters/CycleCountId'
+    get:
+      tags: [CycleCounts]
+      summary: Get a cycle count session by id, including its lines.
+      responses:
+        '200':
+          description: Cycle count found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/cycle-counts/{cycleCountId}/lines/{lineId}/count:
+    parameters:
+      - $ref: '#/components/parameters/CycleCountId'
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [CycleCounts]
+      summary: Record (or overwrite) this line's counted quantity. Only while OPEN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordCycleCountLineRequest' }
+      responses:
+        '200':
+          description: Count recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: CYCLE_COUNT_NOT_OPEN
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/cycle-counts/{cycleCountId}/approval:
+    parameters:
+      - $ref: '#/components/parameters/CycleCountId'
+    post:
+      tags: [CycleCounts]
+      summary: Transition OPEN -> APPROVED, posting one adjustment per line whose count differs from the live system quantity.
+      responses:
+        '200':
+          description: Cycle count approved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: CYCLE_COUNT_NOT_OPEN, CYCLE_COUNT_INCOMPLETE, or PRODUCT_INACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/cycle-counts/{cycleCountId}/cancellation:
+    parameters:
+      - $ref: '#/components/parameters/CycleCountId'
+    post:
+      tags: [CycleCounts]
+      summary: Transition OPEN -> CANCELLED, posting nothing.
+      responses:
+        '200':
+          description: Cycle count cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CycleCountResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: CYCLE_COUNT_NOT_OPEN
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    CycleCountId:
+      name: cycleCountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    CycleCountStatus:
+      type: string
+      enum: [OPEN, APPROVED, CANCELLED]
+    CycleCountScope:
+      type: string
+      enum: [FULL, SELECTION]
+
+    CycleCountLineResponse:
+      type: object
+      required: [id, productId]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        countedQuantity: { type: integer, nullable: true }
+
+    CycleCountResponse:
+      type: object
+      required: [id, warehouseId, scope, status, lines]
+      properties:
+        id: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        scope: { $ref: '#/components/schemas/CycleCountScope' }
+        status: { $ref: '#/components/schemas/CycleCountStatus' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/CycleCountLineResponse' }
+
+    CreateCycleCountRequest:
+      type: object
+      required: [warehouseId]
+      properties:
+        warehouseId: { type: string, format: uuid }
+        productIds:
+          type: array
+          nullable: true
+          items: { type: string, format: uuid }
+          description: Omitted/null counts every product with stock at the warehouse (FULL).
+
+    RecordCycleCountLineRequest:
+      type: object
+      required: [countedQuantity]
+      properties:
+        countedQuantity: { type: integer, minimum: 0 }
+
+    CycleCountPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CycleCountResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

@@ -1,0 +1,384 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Suppliers & Purchase Orders
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/03-suppliers-and-purchase-orders/requirements.md.
+    Implemented. Paths are scoped under /api/v1 per docs/conventions/api-design.md.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List suppliers.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: name
+          schema: { type: string }
+          description: Partial, case-insensitive match.
+      responses:
+        '200':
+          description: Paginated list of suppliers.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierPage' }
+    post:
+      tags: [Suppliers]
+      summary: Create a supplier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSupplierRequest' }
+      responses:
+        '201':
+          description: Supplier created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierResponse' }
+        '409':
+          description: SUPPLIER_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/suppliers/{supplierId}:
+    parameters:
+      - name: supplierId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Suppliers]
+      summary: Get a supplier by id.
+      responses:
+        '200':
+          description: Supplier found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Suppliers]
+      summary: Partially update a supplier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSupplierRequest' }
+      responses:
+        '200':
+          description: Supplier updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SUPPLIER_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/purchase-orders:
+    get:
+      tags: [PurchaseOrders]
+      summary: List purchase orders.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: supplierId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+      responses:
+        '200':
+          description: Paginated list of purchase orders.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderPage' }
+    post:
+      tags: [PurchaseOrders]
+      summary: Create a purchase order in DRAFT status with its lines.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePurchaseOrderRequest' }
+      responses:
+        '201':
+          description: Purchase order created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '409':
+          description: WAREHOUSE_INACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown supplierId/warehouseId/productId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/purchase-orders/{purchaseOrderId}:
+    parameters:
+      - $ref: '#/components/parameters/PurchaseOrderId'
+    get:
+      tags: [PurchaseOrders]
+      summary: Get a purchase order by id, including its lines.
+      responses:
+        '200':
+          description: Purchase order found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [PurchaseOrders]
+      summary: Update expectedDeliveryDate. Only while DRAFT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePurchaseOrderRequest' }
+      responses:
+        '200':
+          description: Purchase order updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: PURCHASE_ORDER_NOT_EDITABLE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/purchase-orders/{purchaseOrderId}/placement:
+    parameters:
+      - $ref: '#/components/parameters/PurchaseOrderId'
+    post:
+      tags: [PurchaseOrders]
+      summary: Transition DRAFT -> ORDERED.
+      responses:
+        '200':
+          description: Purchase order placed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: PURCHASE_ORDER_NOT_DRAFT
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/purchase-orders/{purchaseOrderId}/cancellation:
+    parameters:
+      - $ref: '#/components/parameters/PurchaseOrderId'
+    post:
+      tags: [PurchaseOrders]
+      summary: Transition DRAFT or ORDERED -> CANCELLED.
+      responses:
+        '200':
+          description: Purchase order cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: PURCHASE_ORDER_NOT_CANCELLABLE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/purchase-orders/{purchaseOrderId}/lines/{lineId}/receipts:
+    parameters:
+      - $ref: '#/components/parameters/PurchaseOrderId'
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [PurchaseOrders]
+      summary: Record receiving some or all of this line's remaining quantity. May auto-transition the order to RECEIVED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceivePurchaseOrderLineRequest' }
+      responses:
+        '200':
+          description: Receipt recorded; the purchase order (possibly now RECEIVED) is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: PURCHASE_ORDER_NOT_ORDERED, RECEIPT_EXCEEDS_ORDERED_QUANTITY, or PRODUCT_INACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    PurchaseOrderId:
+      name: purchaseOrderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    SupplierResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+    CreateSupplierRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+    UpdateSupplierRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+    SupplierPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SupplierResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }
+
+    PurchaseOrderStatus:
+      type: string
+      enum: [DRAFT, ORDERED, RECEIVED, CANCELLED]
+
+    PurchaseOrderLineResponse:
+      type: object
+      required: [id, productId, quantityOrdered, quantityReceived, unitCost]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        quantityOrdered: { type: integer }
+        quantityReceived: { type: integer }
+        unitCost: { type: number, format: decimal }
+
+    CreatePurchaseOrderLineRequest:
+      type: object
+      required: [productId, quantityOrdered, unitCost]
+      properties:
+        productId: { type: string, format: uuid }
+        quantityOrdered: { type: integer, minimum: 1 }
+        unitCost: { type: number, format: decimal, minimum: 0 }
+
+    PurchaseOrderResponse:
+      type: object
+      required: [id, supplierId, warehouseId, status, lines]
+      properties:
+        id: { type: string, format: uuid }
+        supplierId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseOrderLineResponse' }
+
+    CreatePurchaseOrderRequest:
+      type: object
+      required: [supplierId, warehouseId, lines]
+      properties:
+        supplierId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreatePurchaseOrderLineRequest' }
+
+    UpdatePurchaseOrderRequest:
+      type: object
+      properties:
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+
+    ReceivePurchaseOrderLineRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+
+    PurchaseOrderPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseOrderResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+    Baseline ruleset for inventory-api. Deliberately lean: catches the mistakes the
+    project's own conventions call out (unused imports, star imports, magic numbers,
+    naming), not a full Sun/Google-style reformat. Extend this file as real violations
+    show up in review, rather than front-loading every possible check.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="warning"/>
+
+    <module name="TreeWalker">
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+        <module name="AvoidStarImport"/>
+
+        <module name="EqualsHashCode"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+
+        <!-- Allows both plain camelCase and the project's given<Context>_when<Action>_then<Outcome>
+             test naming convention (docs/conventions/testing.md). -->
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*(_[a-zA-Z][a-zA-Z0-9]*)*$"/>
+        </module>
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="ConstantName"/>
+
+        <module name="EmptyBlock">
+            <property name="option" value="text"/>
+        </module>
+        <module name="NeedBraces"/>
+    </module>
+
+    <module name="FileTabCharacter"/>
+</module>

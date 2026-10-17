@@ -1,0 +1,170 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Webhooks
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/14-webhooks/requirements.md. Implemented.
+    Subscription management only - delivery itself is an internal, unauthenticated-inbound
+    concern (this API is the caller, never the callee).
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/webhooks/subscriptions:
+    get:
+      tags: [Webhooks]
+      summary: List webhook subscriptions.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSubscriptionPage' }
+        '403':
+          description: Caller is below ADMIN.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+    post:
+      tags: [Webhooks]
+      summary: Create a webhook subscription.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWebhookSubscriptionRequest' }
+      responses:
+        '201':
+          description: Created - secret is present only on this response, once.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedWebhookSubscriptionResponse' }
+        '403':
+          description: Caller is below ADMIN.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (blank url, empty eventTypes).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/webhooks/subscriptions/{subscriptionId}:
+    parameters:
+      - in: path
+        name: subscriptionId
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Webhooks]
+      summary: Partially update a subscription - url, eventTypes, and/or enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWebhookSubscriptionRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSubscriptionResponse' }
+        '403':
+          description: Caller is below ADMIN.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404':
+          description: WEBHOOK_SUBSCRIPTION_NOT_FOUND
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+
+    WebhookEventType:
+      type: string
+      enum: [STOCK_ALERT_ACTIVATED, SALES_ORDER_SHIPPED, PURCHASE_ORDER_RECEIVED, CYCLE_COUNT_APPROVED]
+
+    CreateWebhookSubscriptionRequest:
+      type: object
+      required: [url, eventTypes]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+        eventTypes:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/WebhookEventType' }
+
+    UpdateWebhookSubscriptionRequest:
+      type: object
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+        eventTypes:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookEventType' }
+        enabled: { type: boolean }
+
+    WebhookSubscriptionResponse:
+      type: object
+      required: [id, url, eventTypes, enabled]
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string }
+        eventTypes:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookEventType' }
+        enabled: { type: boolean }
+
+    CreatedWebhookSubscriptionResponse:
+      allOf:
+        - $ref: '#/components/schemas/WebhookSubscriptionResponse'
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              description: Present only on this create response - once, never retrievable again.
+
+    WebhookSubscriptionPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookSubscriptionResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

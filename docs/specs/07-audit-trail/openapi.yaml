@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: Inventory API - Audit trail
+  version: "1.0"
+paths:
+  /api/v1/audit:
+    get:
+      tags: [Audit]
+      summary: List audit log entries. Requires ADMIN.
+      parameters:
+        - name: entityType
+          in: query
+          schema:
+            $ref: '#/components/schemas/AuditEntityType'
+        - name: entityId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            $ref: '#/components/schemas/AuditAction'
+        - name: occurredFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: occurredTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list of audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogEntry'
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  totalCount:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '403':
+          description: FORBIDDEN - caller is not ADMIN
+  /api/v1/audit/{id}:
+    get:
+      tags: [Audit]
+      summary: Get a single audit log entry by id. Requires ADMIN.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audit entry found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogEntry'
+        '403':
+          description: FORBIDDEN - caller is not ADMIN
+        '404':
+          description: Not found
+components:
+  schemas:
+    AuditEntityType:
+      type: string
+      enum: [CATEGORY, PRODUCT, WAREHOUSE, SUPPLIER, PURCHASE_ORDER, REORDER_THRESHOLD]
+    AuditAction:
+      type: string
+      enum: [CREATED, UPDATED]
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          $ref: '#/components/schemas/AuditEntityType'
+        entityId:
+          type: string
+          format: uuid
+        action:
+          $ref: '#/components/schemas/AuditAction'
+        actorId:
+          type: string
+          nullable: true
+          description: The JWT sub claim of whoever made the change, or null if unattributable.
+        actorUsername:
+          type: string
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+        oldValue:
+          type: object
+          nullable: true
+          description: Snapshot of the entity before the change. Null for a CREATED entry.
+        newValue:
+          type: object
+          description: Snapshot of the entity after the change.

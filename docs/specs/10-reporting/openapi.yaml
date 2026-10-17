@@ -1,0 +1,171 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Reporting
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/10-reporting/requirements.md. Implemented. Paths are
+    scoped under /api/v1 per docs/conventions/api-design.md. All three endpoints require
+    MANAGER or above.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/reports/inventory-valuation:
+    get:
+      tags: [Reporting]
+      summary: Paginated inventory valuation, one row per (productId, warehouseId).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Paginated valuation rows.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryValuationPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/reports/stock-movement-summary:
+    get:
+      tags: [Reporting]
+      summary: Aggregated movement counts/quantities per StockMovementType. Not paginated.
+      parameters:
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: productId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: occurredFrom
+          schema: { type: string, format: date-time }
+        - in: query
+          name: occurredTo
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Movement summary.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockMovementSummaryResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/reports/stock-aging:
+    get:
+      tags: [Reporting]
+      summary: Paginated stock aging, one row per (productId, warehouseId). Not pre-sorted by staleness.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: asOf
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Paginated aging rows.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockAgingPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    Forbidden:
+      description: FORBIDDEN - caller is below MANAGER.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+
+    InventoryValuationRow:
+      type: object
+      required: [productId, warehouseId, categoryId, quantityOnHand]
+      properties:
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        quantityOnHand: { type: integer }
+        unitCost: { type: number, format: decimal, nullable: true }
+        value: { type: number, format: decimal, nullable: true }
+
+    InventoryValuationPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages, pageTotalValue, excludedCount]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/InventoryValuationRow' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }
+        pageTotalValue: { type: number, format: decimal }
+        excludedCount: { type: integer }
+
+    StockMovementTypeTotals:
+      type: object
+      required: [count, totalQuantity]
+      properties:
+        count: { type: integer }
+        totalQuantity: { type: integer }
+
+    StockMovementSummaryResponse:
+      type: object
+      required: [totalsByType]
+      properties:
+        totalsByType:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/StockMovementTypeTotals' }
+          description: Keyed by StockMovementType name (RECEIPT, SHIPMENT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT_INCREASE, ADJUSTMENT_DECREASE) - all six always present.
+
+    StockAgingRow:
+      type: object
+      required: [productId, warehouseId, quantityOnHand]
+      properties:
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        quantityOnHand: { type: integer }
+        lastMovementAt: { type: string, format: date-time, nullable: true }
+        daysSinceLastMovement: { type: integer, nullable: true }
+
+    StockAgingPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StockAgingRow' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

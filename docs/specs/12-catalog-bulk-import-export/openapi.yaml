@@ -1,0 +1,111 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Catalog Bulk Import/Export
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/12-catalog-bulk-import-export/requirements.md.
+    Implemented. CSV bulk import/export, scoped to Product only.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/products/import:
+    post:
+      tags: [Products]
+      summary: Bulk-create products from a CSV file. Row-partial-success, never all-or-nothing.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: text/csv, header row "sku,name,description,categoryName,unitOfMeasure".
+      responses:
+        '200':
+          description: Import outcome - some or all rows may have failed individually.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImportResult' }
+        '403':
+          description: Caller is below MANAGER.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (more than 1000 data rows) - rejected before any
+            row is processed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/products/export:
+    get:
+      tags: [Products]
+      summary: Export products as CSV. Same filters as GET
+        /api/v1/products.
+      parameters:
+        - in: query
+          name: categoryId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: active
+          schema: { type: string }
+          description: 'Omitted: active-only (default). "any": no filter. Otherwise parsed as boolean.'
+        - in: query
+          name: sku
+          schema: { type: string }
+      responses:
+        '200':
+          description: CSV body, header row "sku,name,description,categoryName,unitOfMeasure".
+          content:
+            text/csv:
+              schema: { type: string }
+        '403':
+          description: Caller is below STAFF.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+
+    ProductImportResult:
+      type: object
+      required: [totalRows, importedCount, errors]
+      properties:
+        totalRows: { type: integer }
+        importedCount: { type: integer }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ProductImportRowError' }
+
+    ProductImportRowError:
+      type: object
+      required: [row, sku, message]
+      properties:
+        row:
+          type: integer
+          description: 1-based over data rows only - the header is not row 1.
+        sku:
+          type: string
+          description: The row's raw CSV value, even when unrelated to the failure.
+        message: { type: string }

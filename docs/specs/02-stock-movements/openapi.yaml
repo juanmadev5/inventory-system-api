@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Stock Movements
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/02-stock-movements/requirements.md.
+    Implemented. Paths are scoped under /api/v1 per docs/conventions/api-design.md.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/stock-movements:
+    get:
+      tags: [StockMovements]
+      summary: List stock movements.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: productId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/StockMovementType' }
+        - in: query
+          name: occurredFrom
+          schema: { type: string, format: date-time }
+        - in: query
+          name: occurredTo
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Paginated list of stock movements.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockMovementPage' }
+    post:
+      tags: [StockMovements]
+      summary: Record a single-warehouse movement (RECEIPT, SHIPMENT, ADJUSTMENT_INCREASE, ADJUSTMENT_DECREASE).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateStockMovementRequest' }
+      responses:
+        '201':
+          description: Movement recorded; the affected StockLevel is updated in the same transaction.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockMovementResponse' }
+        '409':
+          description: PRODUCT_INACTIVE, WAREHOUSE_INACTIVE, or INSUFFICIENT_STOCK
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown productId/warehouseId, or a TRANSFER_IN/TRANSFER_OUT type submitted here)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/stock-movements/transfers:
+    post:
+      tags: [StockMovements]
+      summary: Atomically record a TRANSFER_OUT at the source warehouse and a TRANSFER_IN at the destination.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateStockTransferRequest' }
+      responses:
+        '201':
+          description: Both movements recorded; neither is created if the outbound leg fails.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockTransferResponse' }
+        '409':
+          description: PRODUCT_INACTIVE, WAREHOUSE_INACTIVE, or INSUFFICIENT_STOCK
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown ids, or sourceWarehouseId == destinationWarehouseId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/stock-movements/{movementId}:
+    parameters:
+      - name: movementId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [StockMovements]
+      summary: Get a stock movement by id.
+      responses:
+        '200':
+          description: Movement found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockMovementResponse' }
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    StockMovementType:
+      type: string
+      description: Each value has a fixed, implicit sign - never a separate direction field.
+      enum: [RECEIPT, SHIPMENT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT_INCREASE, ADJUSTMENT_DECREASE]
+
+    SingleMovementType:
+      type: string
+      description: The subset of StockMovementType creatable via POST /stock-movements directly.
+      enum: [RECEIPT, SHIPMENT, ADJUSTMENT_INCREASE, ADJUSTMENT_DECREASE]
+
+    CreateStockMovementRequest:
+      type: object
+      required: [productId, warehouseId, type, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/SingleMovementType' }
+        quantity: { type: integer, minimum: 1 }
+        reference: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time, nullable: true, description: Defaults to now if omitted. }
+
+    CreateStockTransferRequest:
+      type: object
+      required: [productId, sourceWarehouseId, destinationWarehouseId, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        sourceWarehouseId: { type: string, format: uuid }
+        destinationWarehouseId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        reference: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time, nullable: true }
+
+    StockMovementResponse:
+      type: object
+      required: [id, productId, warehouseId, type, quantity, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/StockMovementType' }
+        quantity: { type: integer }
+        occurredAt: { type: string, format: date-time }
+        reference: { type: string, nullable: true }
+        relatedMovementId: { type: string, format: uuid, nullable: true }
+
+    StockTransferResponse:
+      type: object
+      required: [outboundMovement, inboundMovement]
+      properties:
+        outboundMovement: { $ref: '#/components/schemas/StockMovementResponse' }
+        inboundMovement: { $ref: '#/components/schemas/StockMovementResponse' }
+
+    StockMovementPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StockMovementResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

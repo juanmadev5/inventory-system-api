@@ -1,0 +1,467 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Catalog & Stock
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/01-catalog-and-stock/requirements.md.
+    Implemented. Paths are scoped under /api/v1 per docs/conventions/api-design.md.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      summary: List categories.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: name
+          schema: { type: string }
+          description: Partial, case-insensitive match.
+        - in: query
+          name: parentCategoryId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Paginated list of categories.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryPage' }
+    post:
+      tags: [Categories]
+      summary: Create a category.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCategoryRequest' }
+      responses:
+        '201':
+          description: Category created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '409':
+          description: CATEGORY_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (e.g. unknown parentCategoryId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/categories/{categoryId}:
+    parameters:
+      - $ref: '#/components/parameters/CategoryId'
+    get:
+      tags: [Categories]
+      summary: Get a category by id.
+      responses:
+        '200':
+          description: Category found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+    patch:
+      tags: [Categories]
+      summary: Partially update a category.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCategoryRequest' }
+      responses:
+        '200':
+          description: Category updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: CATEGORY_IN_USE (on an attempt to clear/reparent in a way that
+            would orphan a product - see requirements.md) or CATEGORY_NAME_ALREADY_EXISTS.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/products:
+    get:
+      tags: [Products]
+      summary: List products.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: categoryId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: active
+          schema: { type: string, enum: ['true', 'false', 'any'] }
+          description: Defaults to 'true' - set 'any' to include inactive products.
+        - in: query
+          name: sku
+          schema: { type: string }
+          description: Exact match.
+      responses:
+        '200':
+          description: Paginated list of products.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPage' }
+    post:
+      tags: [Products]
+      summary: Create a product.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProductRequest' }
+      responses:
+        '201':
+          description: Product created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '409':
+          description: PRODUCT_SKU_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (e.g. unknown categoryId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Products]
+      summary: Get a product by id.
+      responses:
+        '200':
+          description: Product found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Products]
+      summary: Partially update a product, including deactivating it (active=false).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProductRequest' }
+      responses:
+        '200':
+          description: Product updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: PRODUCT_SKU_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/warehouses:
+    get:
+      tags: [Warehouses]
+      summary: List warehouses.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: active
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Paginated list of warehouses.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePage' }
+    post:
+      tags: [Warehouses]
+      summary: Create a warehouse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWarehouseRequest' }
+      responses:
+        '201':
+          description: Warehouse created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseResponse' }
+        '409':
+          description: WAREHOUSE_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/warehouses/{warehouseId}:
+    parameters:
+      - $ref: '#/components/parameters/WarehouseId'
+    get:
+      tags: [Warehouses]
+      summary: Get a warehouse by id.
+      responses:
+        '200':
+          description: Warehouse found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Warehouses]
+      summary: Partially update a warehouse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWarehouseRequest' }
+      responses:
+        '200':
+          description: Warehouse updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/stock-levels:
+    get:
+      tags: [StockLevels]
+      summary: List current stock levels (read-only in this feature).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: productId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Paginated list of stock levels.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevelPage' }
+
+  /api/v1/stock-levels/{stockLevelId}:
+    parameters:
+      - name: stockLevelId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [StockLevels]
+      summary: Get a stock level row by id.
+      responses:
+        '200':
+          description: Stock level found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevelResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+      description: 1-based page number.
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WarehouseId:
+      name: warehouseId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          description: Stable, machine-readable code - see docs/conventions/error-handling-and-logging.md.
+        errors:
+          type: array
+          description: Present only for VALIDATION_FAILED.
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    CategoryResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        parentCategoryId: { type: string, format: uuid, nullable: true }
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        parentCategoryId: { type: string, format: uuid, nullable: true }
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        parentCategoryId: { type: string, format: uuid, nullable: true }
+    CategoryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageEnvelope'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/CategoryResponse' }
+
+    ProductResponse:
+      type: object
+      required: [id, sku, name, categoryId, unitOfMeasure, active]
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        categoryId: { type: string, format: uuid }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+        active: { type: boolean }
+    CreateProductRequest:
+      type: object
+      required: [sku, name, categoryId, unitOfMeasure]
+      properties:
+        sku: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        categoryId: { type: string, format: uuid }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+    UpdateProductRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        categoryId: { type: string, format: uuid }
+        active: { type: boolean }
+    UnitOfMeasure:
+      type: string
+      enum: [EACH, KG, LITER]
+    ProductPage:
+      allOf:
+        - $ref: '#/components/schemas/PageEnvelope'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ProductResponse' }
+
+    WarehouseResponse:
+      type: object
+      required: [id, name, active]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        address: { type: string, nullable: true }
+        active: { type: boolean }
+    CreateWarehouseRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        address: { type: string, nullable: true }
+    UpdateWarehouseRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        address: { type: string, nullable: true }
+        active: { type: boolean }
+    WarehousePage:
+      allOf:
+        - $ref: '#/components/schemas/PageEnvelope'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseResponse' }
+
+    StockLevelResponse:
+      type: object
+      required: [id, productId, warehouseId, quantityOnHand, quantityReserved]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        quantityOnHand: { type: integer }
+        quantityReserved: { type: integer }
+    StockLevelPage:
+      allOf:
+        - $ref: '#/components/schemas/PageEnvelope'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/StockLevelResponse' }
+
+    PageEnvelope:
+      type: object
+      required: [page, pageSize, totalCount, totalPages]
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.jm.inventory: DEBUG
+
+app:
+  security:
+    bootstrap-admin:
+      # Convenience default for local dev only - AdminBootstrapRunner only ever uses this
+      # to create the very first ADMIN, and only if the users table is still empty.
+      email: ${APP_ADMIN_EMAIL:admin@example.com}
+      password: ${APP_ADMIN_PASSWORD:ChangeMe123!}

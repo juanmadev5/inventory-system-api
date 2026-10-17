@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - User Management
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/11-user-management/requirements.md.
+    Implemented. ADMIN-only throughout - see requirements.md's "Decision".
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List every user.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated list of users.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      summary: Create a teammate with a one-time temporary password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserRequest' }
+      responses:
+        '201':
+          description: User created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedUserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: USER_EMAIL_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      summary: Get a user by id.
+      responses:
+        '200':
+          description: User found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/users/{userId}/role:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [Users]
+      summary: Replace the user's role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeUserRoleRequest' }
+      responses:
+        '200':
+          description: Role changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/users/{userId}/deactivation:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      summary: Disable the user's account.
+      responses:
+        '200':
+          description: User deactivated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/users/{userId}/reactivation:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      summary: Re-enable the user's account.
+      responses:
+        '200':
+          description: User reactivated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: FORBIDDEN - caller is not ADMIN.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    NotFound:
+      description: USER_NOT_FOUND
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+
+    UserRole:
+      type: string
+      enum: [STAFF, MANAGER, ADMIN]
+
+    UserResponse:
+      type: object
+      required: [id, email, role, active, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreatedUserResponse:
+      type: object
+      required: [user, temporaryPassword]
+      properties:
+        user: { $ref: '#/components/schemas/UserResponse' }
+        temporaryPassword:
+          type: string
+          description: Returned once, here, only. Never retrievable again.
+
+    CreateUserRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+
+    ChangeUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: '#/components/schemas/UserRole' }
+
+    UserPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/UserResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

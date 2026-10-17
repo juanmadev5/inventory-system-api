@@ -1,0 +1,386 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Sales Orders & Customers
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/08-sales-orders-and-customers/requirements.md.
+    Implemented. Paths are scoped under /api/v1 per docs/conventions/api-design.md. Mirrors
+    03-suppliers-and-purchase-orders/openapi.yaml - a sales order is the outbound symmetric
+    twin of a purchase order.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/customers:
+    get:
+      tags: [Customers]
+      summary: List customers.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: name
+          schema: { type: string }
+          description: Partial, case-insensitive match.
+      responses:
+        '200':
+          description: Paginated list of customers.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPage' }
+    post:
+      tags: [Customers]
+      summary: Create a customer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCustomerRequest' }
+      responses:
+        '201':
+          description: Customer created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerResponse' }
+        '409':
+          description: CUSTOMER_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/customers/{customerId}:
+    parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Customers]
+      summary: Get a customer by id.
+      responses:
+        '200':
+          description: Customer found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Customers]
+      summary: Partially update a customer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCustomerRequest' }
+      responses:
+        '200':
+          description: Customer updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: CUSTOMER_NAME_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/sales-orders:
+    get:
+      tags: [SalesOrders]
+      summary: List sales orders.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/SalesOrderStatus' }
+      responses:
+        '200':
+          description: Paginated list of sales orders.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderPage' }
+    post:
+      tags: [SalesOrders]
+      summary: Create a sales order in DRAFT status with its lines.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSalesOrderRequest' }
+      responses:
+        '201':
+          description: Sales order created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '409':
+          description: WAREHOUSE_INACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown customerId/warehouseId/productId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/sales-orders/{salesOrderId}:
+    parameters:
+      - $ref: '#/components/parameters/SalesOrderId'
+    get:
+      tags: [SalesOrders]
+      summary: Get a sales order by id, including its lines.
+      responses:
+        '200':
+          description: Sales order found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [SalesOrders]
+      summary: Update expectedShipDate. Only while DRAFT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSalesOrderRequest' }
+      responses:
+        '200':
+          description: Sales order updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SALES_ORDER_NOT_EDITABLE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/sales-orders/{salesOrderId}/confirmation:
+    parameters:
+      - $ref: '#/components/parameters/SalesOrderId'
+    post:
+      tags: [SalesOrders]
+      summary: Transition DRAFT -> CONFIRMED, reserving stock for every line.
+      responses:
+        '200':
+          description: Sales order confirmed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SALES_ORDER_NOT_DRAFT or INSUFFICIENT_STOCK
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/sales-orders/{salesOrderId}/cancellation:
+    parameters:
+      - $ref: '#/components/parameters/SalesOrderId'
+    post:
+      tags: [SalesOrders]
+      summary: Transition DRAFT or CONFIRMED -> CANCELLED, releasing any remaining reservation.
+      responses:
+        '200':
+          description: Sales order cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SALES_ORDER_NOT_CANCELLABLE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/sales-orders/{salesOrderId}/lines/{lineId}/shipments:
+    parameters:
+      - $ref: '#/components/parameters/SalesOrderId'
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [SalesOrders]
+      summary: Record shipping some or all of this line's remaining quantity. May auto-transition the order to SHIPPED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShipSalesOrderLineRequest' }
+      responses:
+        '200':
+          description: Shipment recorded; the sales order (possibly now SHIPPED) is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesOrderResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SALES_ORDER_NOT_CONFIRMED or SHIPMENT_EXCEEDS_ORDERED_QUANTITY
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SalesOrderId:
+      name: salesOrderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    CustomerResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+    CreateCustomerRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+    CustomerPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CustomerResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }
+
+    SalesOrderStatus:
+      type: string
+      enum: [DRAFT, CONFIRMED, SHIPPED, CANCELLED]
+
+    SalesOrderLineResponse:
+      type: object
+      required: [id, productId, quantityOrdered, quantityShipped, unitPrice]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        quantityOrdered: { type: integer }
+        quantityShipped: { type: integer }
+        unitPrice: { type: number, format: decimal }
+
+    CreateSalesOrderLineRequest:
+      type: object
+      required: [productId, quantityOrdered, unitPrice]
+      properties:
+        productId: { type: string, format: uuid }
+        quantityOrdered: { type: integer, minimum: 1 }
+        unitPrice: { type: number, format: decimal, minimum: 0 }
+
+    SalesOrderResponse:
+      type: object
+      required: [id, customerId, warehouseId, status, lines]
+      properties:
+        id: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/SalesOrderStatus' }
+        expectedShipDate: { type: string, format: date, nullable: true }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/SalesOrderLineResponse' }
+
+    CreateSalesOrderRequest:
+      type: object
+      required: [customerId, warehouseId, lines]
+      properties:
+        customerId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        expectedShipDate: { type: string, format: date, nullable: true }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateSalesOrderLineRequest' }
+
+    UpdateSalesOrderRequest:
+      type: object
+      properties:
+        expectedShipDate: { type: string, format: date, nullable: true }
+
+    ShipSalesOrderLineRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+
+    SalesOrderPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SalesOrderResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

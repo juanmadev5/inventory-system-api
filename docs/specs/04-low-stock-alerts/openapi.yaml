@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Low-Stock Alerts
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/04-low-stock-alerts/requirements.md.
+    Implemented. Paths are scoped under /api/v1 per docs/conventions/api-design.md.
+security:
+  - bearer-jwt: []
+paths:
+  /api/v1/reorder-thresholds:
+    get:
+      tags: [ReorderThresholds]
+      summary: List reorder thresholds.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: productId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Paginated list of reorder thresholds.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderThresholdPage' }
+    post:
+      tags: [ReorderThresholds]
+      summary: Create a reorder threshold for a (productId, warehouseId) pair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReorderThresholdRequest' }
+      responses:
+        '201':
+          description: Reorder threshold created.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderThresholdResponse' }
+        '409':
+          description: REORDER_THRESHOLD_ALREADY_EXISTS
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '422':
+          description: VALIDATION_FAILED (unknown productId/warehouseId)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/reorder-thresholds/{thresholdId}:
+    parameters:
+      - name: thresholdId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [ReorderThresholds]
+      summary: Get a reorder threshold by id.
+      responses:
+        '200':
+          description: Reorder threshold found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderThresholdResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [ReorderThresholds]
+      summary: Update reorderPoint and/or reorderQuantity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateReorderThresholdRequest' }
+      responses:
+        '200':
+          description: Reorder threshold updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderThresholdResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/stock-alerts:
+    get:
+      tags: [StockAlerts]
+      summary: List every (productId, warehouseId) pair currently at or below its configured reorder point.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: warehouseId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Paginated list of stock alerts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockAlertPage' }
+
+components:
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    ReorderThresholdResponse:
+      type: object
+      required: [id, productId, warehouseId, reorderPoint, reorderQuantity]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        reorderPoint: { type: integer }
+        reorderQuantity: { type: integer }
+
+    CreateReorderThresholdRequest:
+      type: object
+      required: [productId, warehouseId, reorderPoint, reorderQuantity]
+      properties:
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        reorderPoint: { type: integer, minimum: 0 }
+        reorderQuantity: { type: integer, minimum: 1 }
+
+    UpdateReorderThresholdRequest:
+      type: object
+      properties:
+        reorderPoint: { type: integer, minimum: 0, nullable: true }
+        reorderQuantity: { type: integer, minimum: 1, nullable: true }
+
+    ReorderThresholdPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReorderThresholdResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }
+
+    StockAlertResponse:
+      type: object
+      required: [id, productId, warehouseId, quantityOnHand, reorderPoint, reorderQuantity]
+      properties:
+        id: { type: string, format: uuid, description: The underlying reorder threshold's id. }
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        quantityOnHand: { type: integer }
+        reorderPoint: { type: integer }
+        reorderQuantity: { type: integer }
+
+    StockAlertPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StockAlertResponse' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+        totalPages: { type: integer }

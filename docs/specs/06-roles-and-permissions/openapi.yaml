@@ -1,0 +1,45 @@
+openapi: 3.0.3
+info:
+  title: Inventory API - Roles & permissions (cross-cutting addendum)
+  version: "1.0"
+  description: >
+    This feature adds no new resource or endpoint - it adds one new possible response
+    (403, code FORBIDDEN) to every endpoint already documented in 01-catalog-and-stock,
+    02-stock-movements, 03-suppliers-and-purchase-orders, and 04-low-stock-alerts's own
+    openapi.yaml files. Those files are not duplicated here; this document only defines the
+    shared response component those contracts gain, for reference, per requirements.md's
+    endpoint-by-endpoint mapping.
+paths: {}
+components:
+  responses:
+    Forbidden:
+      description: >
+        The authenticated caller's role (from the JWT's role claim) does not
+        meet the minimum role this operation requires - see requirements.md's permission
+        matrix.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Forbidden
+            status: 403
+            detail: The caller's role does not permit this operation.
+            code: FORBIDDEN
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 7807 problem detail, as produced by GlobalExceptionHandler.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          description: Stable, machine-readable error code - FORBIDDEN for this feature.
