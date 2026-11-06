@@ -35,4 +35,9 @@ COPY --from=build /build/api/target/inventory-api.jar ./app.jar
 USER inventory-api
 
 EXPOSE 8081
+# Liveness only (is the app up and serving HTTP), not /actuator/health: that one also
+# reports Postgres and Redis, and Redis being down must not mark a container unhealthy -
+# the app keeps serving without it (see docs/specs/15-reference-data-caching/).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD wget -q -O /dev/null "http://127.0.0.1:${SERVER_PORT:-8081}/actuator/health/liveness" || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
