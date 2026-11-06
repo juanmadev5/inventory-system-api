@@ -41,7 +41,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder,
             CorsConfigurationSource corsConfigurationSource, LoginRateLimitFilter loginRateLimitFilter,
-            ApiRateLimitFilter apiRateLimitFilter, AuthenticatedUserMdcFilter authenticatedUserMdcFilter)
+            ApiRateLimitFilter apiRateLimitFilter, AuthenticatedUserMdcFilter authenticatedUserMdcFilter,
+            ProblemDetailAuthenticationEntryPoint authenticationEntryPoint)
             throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
@@ -50,9 +51,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
-                        .decoder(jwtDecoder)
-                        .jwtAuthenticationConverter(new RoleJwtAuthenticationConverter())))
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(authenticationEntryPoint))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder)
+                                .jwtAuthenticationConverter(new RoleJwtAuthenticationConverter())))
                 .addFilterBefore(loginRateLimitFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(authenticatedUserMdcFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(apiRateLimitFilter, AuthenticatedUserMdcFilter.class);

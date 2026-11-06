@@ -13,6 +13,25 @@ Every error response is RFC 7807 `ProblemDetail` with a stable `code` property f
 `ErrorCode` (`application/.../common/ErrorCode.java`) or a feature-specific enum added
 alongside it - never a raw exception message surfaced to the caller.
 
+That includes the errors Spring raises itself, which keep Spring's status but always get a
+`code` (`GlobalExceptionHandler.handleExceptionInternal`) - pinned by
+`ErrorResponsesIntegrationTest`:
+
+| Case | Status | `code` |
+|---|---|---|
+| Body fails Bean Validation (`@NotBlank`, `@Positive`, `@Email`, ...) | `400` | `VALIDATION_FAILED` + `errors[{field, message}]` |
+| Reference to a non-existent entity (`InvalidReferenceException`) | `422` | `VALIDATION_FAILED` + `errors[{field, message}]` |
+| Malformed JSON, unknown enum value, non-UUID path id, missing/mistyped param | `400` | `MALFORMED_REQUEST` |
+| Unknown route / unsupported method | `404` / `405` | `ENDPOINT_NOT_FOUND` / `METHOD_NOT_ALLOWED` |
+| Unsupported `Content-Type` / unacceptable `Accept` / upload too large | `415` / `406` / `413` | `UNSUPPORTED_MEDIA_TYPE` / `NOT_ACCEPTABLE` / `PAYLOAD_TOO_LARGE` |
+| Missing, malformed or expired access token | `401` (+ `WWW-Authenticate: Bearer`) | `UNAUTHENTICATED` |
+
+Bean Validation and unknown references share `VALIDATION_FAILED` and the same `errors`
+shape (`FieldError`) on purpose - a client branches on `code`, and the status only says
+which layer caught it, per each feature spec. The `401` is written by
+`ProblemDetailAuthenticationEntryPoint`, since it happens inside the security filter chain
+before any controller advice can run.
+
 ## Logging
 
 SLF4J + Logback (Spring Boot's default), structured via parameterized messages and MDC -
