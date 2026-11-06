@@ -8,8 +8,14 @@ package com.jm.inventory.application.common;
  */
 public enum ErrorCode {
     VALIDATION_FAILED,
+    MALFORMED_REQUEST,
     UNAUTHENTICATED,
     FORBIDDEN,
+    ENDPOINT_NOT_FOUND,
+    METHOD_NOT_ALLOWED,
+    NOT_ACCEPTABLE,
+    PAYLOAD_TOO_LARGE,
+    UNSUPPORTED_MEDIA_TYPE,
     RATE_LIMIT_EXCEEDED,
     INTERNAL_ERROR
 }

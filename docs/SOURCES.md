@@ -39,6 +39,29 @@ noted, by actually resolving the dependency and inspecting the jar:
   at `@SpringBootTest` context load - a second, more subtle instance of the exact gotcha
   above, caught by `./mvnw test`, not by `./mvnw compile`.
 
+## Redis cache (Spring Data Redis 4.1.1 / Spring Framework 7.0.9)
+
+Each confirmed by inspecting the resolved jar (`javap`, and the `-sources` jar where
+behavior mattered), for docs/specs/15-reference-data-caching/:
+
+- `RedisCacheManager.builder(RedisConnectionFactory)` exposes `cacheDefaults`,
+  `withCacheConfiguration`, `disableCreateOnMissingCache` and `transactionAware`;
+  `RedisCacheConfiguration` exposes `prefixCacheNameWith`, `disableCachingNullValues`,
+  `entryTtl(Duration)` and `serializeValuesWith` - `org.springframework.data.redis.cache`.
+- The Jackson 3 serializer is `org.springframework.data.redis.serializer.JacksonJsonRedisSerializer`
+  (constructor `(tools.jackson.databind.ObjectMapper, Class<T>)`); the `Jackson2*` classes
+  next to it are the Jackson 2 variants.
+- `TransactionAwareCacheManagerProxy` / `TransactionAwareCacheDecorator` live in
+  `spring-context-support` (`org.springframework.cache.transaction`), not `spring-context`.
+  The decorator's source shows `put`/`evict`/`clear` registering an `afterCommit`
+  synchronization when a transaction is active - which runs outside any
+  `CacheErrorHandler`, the reason `FailOpenCache` sits beneath it.
+- `ConditionalOnProperty` is still `org.springframework.boot.autoconfigure.condition`
+  (`spring-boot-autoconfigure-4.1.1`).
+- `spring-boot-starter-parent` 4.1.1 configures `maven-compiler-plugin` with
+  `<parameters>true</parameters>`, which is what lets Jackson build a Lombok `@Value`
+  class through its unannotated all-args constructor.
+
 ## springdoc-openapi / Spring Boot 4 compatibility
 
 - springdoc-openapi v3.x targets Spring Boot 4; pinned to `3.1.1` (latest release at the

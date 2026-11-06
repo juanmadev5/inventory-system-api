@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: Inventory API - Reference-data caching (no contract change)
+  version: v1
+  description: >
+    Contract-first spec for docs/specs/15-reference-data-caching/requirements.md. Implemented.
+    This feature adds no endpoint, no parameter, no response field and no
+    error code - every response stays exactly as documented in 01-catalog-and-stock's own
+    openapi.yaml (acceptance criterion 9). This file exists only so the feature folder has
+    the same two files as every other spec, and says explicitly that the HTTP contract does
+    not change.
+paths: {}
