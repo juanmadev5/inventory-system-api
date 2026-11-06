@@ -83,8 +83,8 @@ Implemented so far:
 
 The whole domain in [docs/specs/00-domain-overview.md](docs/specs/00-domain-overview.md) is
 implemented as of `10-reporting`, including the sales-orders/cycle-counts extensions `08`/`09`
-added to it; `11`/`12`/`14` are platform-level SaaS-readiness features layered on top, not
-part of that domain overview. The next feature (whatever it turns out to be) still follows
+added to it; `11`/`12`/`14`/`15` are platform-level features layered on top, not part of
+that domain overview. The next feature (whatever it turns out to be) still follows
 the same spec-first process above.
 
 A `Dockerfile` for this service exists at the repo root - see
