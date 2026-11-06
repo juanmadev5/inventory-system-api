@@ -3,12 +3,13 @@
 ## Clean Architecture, enforced by the build
 
 Four Maven modules, dependencies pointing inward, enforced physically by `pom.xml` (not
-just by convention - `domain`'s `pom.xml`, once it exists, will declare no dependency on
-`infrastructure`, so the build itself fails if `domain` code ever imports from it):
+just by convention - `domain`'s `pom.xml` declares no dependency on any other module, so
+the build itself fails if `domain` code ever imports from one):
 
 ```
 pom.xml (parent, packaging=pom)
-  application/    # depends on: domain (once it exists)
+  domain/         # depends on: nothing (Lombok only)
+  application/    # depends on: domain
   infrastructure/ # depends on: application, domain
   api/             # depends on: infrastructure, application, domain - the only runnable module
 ```
@@ -23,7 +24,8 @@ its classpath. Added with the catalog/stock feature
   (`CurrentActor`, `PasswordHasher`, `AccessTokenIssuer`), cross-endpoint shared DTOs
   (`PageResponse<T>`, `PaginationDefaults`, `ErrorCode`). No Spring dependency on its
   compile classpath beyond what's needed to be unit-testable in isolation.
-- **`infrastructure/`**: Spring Data JPA entities/repositories, Redis-backed caches,
+- **`infrastructure/`**: Spring Data JPA entities/repositories, Redis-backed caches (on the
+  repository adapters - see [data-and-infra.md](data-and-infra.md)'s Redis section),
   Flyway's runtime dependency (the migration *scripts* live in `api/`, since Flyway needs
   them on the classpath of whichever module actually boots - see
   [data-and-infra.md](data-and-infra.md)).

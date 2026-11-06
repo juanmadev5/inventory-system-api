@@ -17,7 +17,10 @@
   standard `iss`/`iat`/`exp`. Every other endpoint is a Spring Security OAuth2 resource
   server validating that same signature (`JwtDecoder` in `SecurityConfig`, keyed off
   `app.security.jwt.secret`) - there is only ever one issuer, this application itself, so
-  there is no multi-issuer resolution to do.
+  there is no multi-issuer resolution to do. A missing, malformed or expired token is
+  rejected inside the security filter chain with `401`, `WWW-Authenticate: Bearer`, and the
+  same `ProblemDetail` body as every other error, code `UNAUTHENTICATED`
+  (`ProblemDetailAuthenticationEntryPoint`).
 - **`RoleJwtAuthenticationConverter`** maps the `role` claim to a `ROLE_*`
   `GrantedAuthority`; `@RequireStaff`/`@RequireManager`/`@RequireAdmin`
   (`@PreAuthorize`-backed composed annotations) declare the minimum role per controller

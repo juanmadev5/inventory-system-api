@@ -62,3 +62,6 @@ mapping, the `@ExtendWith` above) with a mocked JWT
 scope for that kind of test; see its Javadoc. `AuthControllerIntegrationTest`
 (`api/src/test/java/.../user/`) is the one exception that exercises a real, signed,
 decoded token end to end, since that is exactly what it is testing.
+`ErrorResponsesIntegrationTest` (`api/src/test/java/.../error/`) pins the status and `code`
+of every error shape, including the ones Spring raises itself - a new error case gets a
+test there.

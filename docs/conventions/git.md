@@ -1,13 +1,12 @@
 # Git
 
-This project is not a git repository yet. Whether to `git init` it, and whether to add a
-remote, is a separate question for the developer - never assumed or done proactively.
-
-Once it is one:
+Hosted on GitHub (`origin`). PRs are opened and merged with the `gh` CLI.
 
 - Two permanent branches: `main` (always deployable) and `dev` (integration). All work
   branches off `dev` (`feature/...`, `fix/...`, `chore/...`) and merges back into `dev` via
-  PR; `dev` merges into `main` only at a release point.
+  PR; `dev` merges into `main` only at a release point, via its own PR. PRs are merged
+  with a merge commit (no squash, no rebase). A work branch is deleted, locally and on
+  `origin`, once it is merged.
 - Commits: English, imperative mood, Conventional Commits prefixes (`feat`, `fix`, `chore`,
   `docs`, `test`, `build`). Atomic - one concern per commit.
 - No AI/tool attribution in commit messages or PR descriptions - no `Co-Authored-By:`

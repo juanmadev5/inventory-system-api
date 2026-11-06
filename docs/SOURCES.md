@@ -62,6 +62,23 @@ behavior mattered), for docs/specs/15-reference-data-caching/:
   `<parameters>true</parameters>`, which is what lets Jackson build a Lombok `@Value`
   class through its unannotated all-args constructor.
 
+## Error responses (Spring Framework 7.0.9 / Spring Security 7.1.1)
+
+Confirmed by inspecting the resolved jars, for the "every error has a `code`" fix (see
+[conventions/error-handling-and-logging.md](conventions/error-handling-and-logging.md)):
+
+- `ResponseEntityExceptionHandler` (`spring-webmvc`) exposes the protected overrides
+  `handleMethodArgumentNotValid`, `handleHandlerMethodValidationException` and
+  `handleExceptionInternal(Exception, Object, HttpHeaders, HttpStatusCode, WebRequest)` -
+  every framework-raised error it handles goes through the last one.
+- `ParameterValidationResult` (`spring-context`, `org.springframework.validation.method`)
+  exposes `getMethodParameter()` and `getResolvableErrors()`.
+- `BearerTokenAuthenticationEntryPoint` is
+  `org.springframework.security.oauth2.server.resource.web` (not `.web.authentication`,
+  unlike `BearerTokenAuthenticationFilter`); it sets the `401` and `WWW-Authenticate`
+  header but writes no body. `AuthenticationEntryPoint.commence` declares both
+  `IOException` and `ServletException`.
+
 ## springdoc-openapi / Spring Boot 4 compatibility
 
 - springdoc-openapi v3.x targets Spring Boot 4; pinned to `3.1.1` (latest release at the
