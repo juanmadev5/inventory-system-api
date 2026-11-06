@@ -108,6 +108,11 @@ Postgres/Redis containers.
   copied into a slim `eclipse-temurin:25-jre-alpine-*` runtime stage. Runtime container
   runs as a non-root user. Image tags pinned to an exact version, never a bare `latest`,
   per this project's own dependency-versioning convention applied to base images.
+- The runtime image's `HEALTHCHECK` calls `/actuator/health/liveness` (public, no token -
+  see `SecurityConfig`'s `PUBLIC_PATHS`), never `/actuator/health`: the full health also
+  reports Postgres and Redis, and returns `503` when Redis is down even though the app
+  keeps serving without it. `/actuator/health/readiness` is public too, for an
+  orchestrator that wants it.
 - Configuration (`POSTGRES_*`, `REDIS_*`, `JWT_*`, `APP_ADMIN_*`) is supplied via environment
   variables at `docker run`/compose time - never baked into the image.
 - This repo defines **only** the `Dockerfile` for this one service - any
