@@ -4,11 +4,14 @@ import com.jm.inventory.domain.common.PagedResult;
 import com.jm.inventory.domain.warehouse.Warehouse;
 import com.jm.inventory.domain.warehouse.WarehouseFilter;
 import com.jm.inventory.domain.warehouse.WarehouseRepository;
+import com.jm.inventory.infrastructure.platform.cache.CacheNames;
 import com.jm.inventory.infrastructure.warehouse.persistence.WarehouseJpaEntity;
 import com.jm.inventory.infrastructure.warehouse.persistence.WarehouseSpecifications;
 import com.jm.inventory.infrastructure.warehouse.persistence.WarehouseSpringDataRepository;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +29,7 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.WAREHOUSES_BY_ID, key = "#warehouse.id")
     public Warehouse save(Warehouse warehouse) {
         WarehouseJpaEntity entity = springDataRepository.findById(warehouse.getId())
                 .map(existing -> applyTo(existing, warehouse))
@@ -34,6 +38,7 @@ public class WarehouseRepositoryAdapter implements WarehouseRepository {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.WAREHOUSES_BY_ID, key = "#id", unless = "#result == null")
     public Optional<Warehouse> findById(UUID id) {
         return springDataRepository.findById(id).map(this::toDomain);
     }

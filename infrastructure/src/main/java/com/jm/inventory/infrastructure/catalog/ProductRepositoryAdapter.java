@@ -7,8 +7,11 @@ import com.jm.inventory.domain.common.PagedResult;
 import com.jm.inventory.infrastructure.catalog.persistence.ProductJpaEntity;
 import com.jm.inventory.infrastructure.catalog.persistence.ProductSpecifications;
 import com.jm.inventory.infrastructure.catalog.persistence.ProductSpringDataRepository;
+import com.jm.inventory.infrastructure.platform.cache.CacheNames;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +29,7 @@ public class ProductRepositoryAdapter implements ProductRepository {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS_BY_ID, key = "#product.id")
     public Product save(Product product) {
         ProductJpaEntity entity = springDataRepository.findById(product.getId())
                 .map(existing -> applyTo(existing, product))
@@ -34,6 +38,7 @@ public class ProductRepositoryAdapter implements ProductRepository {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.PRODUCTS_BY_ID, key = "#id", unless = "#result == null")
     public Optional<Product> findById(UUID id) {
         return springDataRepository.findById(id).map(this::toDomain);
     }
