@@ -1,15 +1,29 @@
+### Build output ###
 target/
-.env
-.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+out/
+.mvn/wrapper/maven-wrapper.jar
+*.class
 
-### STS ###
+### Secrets / local config ###
+.env
+.env.*
+!.env.example
+
+### Eclipse / VS Code Java (JDT) - bin/ is its per-module compile output ###
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
 .apt_generated
 .classpath
 .factorypath
 .project
 .settings
+.metadata
 .springBeans
 .sts4-cache
 
@@ -25,9 +39,17 @@ target/
 /dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
+### Claude Code - personal settings only (shared .claude/settings.json is committed) ###
+.claude/settings.local.json
+
+### Logs, OS and editor junk ###
+*.log
+logs/
+.DS_Store
+Thumbs.db
+*.swp
+*~
