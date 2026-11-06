@@ -7,8 +7,8 @@ import com.jm.inventory.domain.common.InvalidReferenceException;
 import com.jm.inventory.domain.common.NotFoundException;
 import com.jm.inventory.domain.user.InvalidCredentialsException;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,14 +23,13 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * malformed request body, etc.) already get a {@code ProblemDetail} shape for free; this
  * class only adds the handlers for this application's own exception types.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
     @ExceptionHandler(InvalidCredentialsException.class)
     public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
-        LOG.warn("Login failed: {}", ex.getMessage());
+        log.warn("Login failed: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problem.setProperty("code", ErrorCode.UNAUTHENTICATED.name());
         return problem;
@@ -52,7 +51,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
-        LOG.warn("Access denied: {}", ex.getMessage());
+        log.warn("Access denied: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.FORBIDDEN, "The caller's role does not permit this operation.");
         problem.setProperty("code", ErrorCode.FORBIDDEN.name());
@@ -70,7 +69,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
-        LOG.error("Unhandled exception", ex);
+        log.error("Unhandled exception", ex);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
         problem.setProperty("code", ErrorCode.INTERNAL_ERROR.name());
