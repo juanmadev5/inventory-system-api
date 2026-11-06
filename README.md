@@ -6,7 +6,9 @@ Inventory management API.
 
 - **Backend**: Spring Boot 4.1, Java 25, Maven multi-module.
 - **Database**: PostgreSQL, Flyway-migrated.
-- **Cache**: Redis.
+- **Cache**: Redis - reference-data cache (see
+  [docs/specs/15-reference-data-caching/](docs/specs/15-reference-data-caching/requirements.md))
+  and the rate limiters' counters.
 - **Auth**: this application is its own identity provider - self-issued/validated JWT, no
   external auth server. See [docs/security.md](docs/security.md).
 
@@ -94,11 +96,12 @@ From the repo root (acts on all four modules: `domain`, `application`, `infrastr
 - `./mvnw compile` - compile everything.
 - `./mvnw checkstyle:check` - static analysis (mandatory before any change is "done" - see
   [docs/conventions/engineering.md](docs/conventions/engineering.md)).
-- `./mvnw test -pl api` - run every test, including the Testcontainers-backed integration
-  tests (need Docker running - they bring up their own Postgres, no `local-infrastructure`
-  dependency) and the `dev`-profile smoke test (`InventoryApiApplicationTests` - this one
-  *does* need `local-infrastructure`'s Postgres/Redis running, with the `inventory`
-  role/database from step 2 above).
+- `./mvnw test` - run every test in every module. Needs Docker (the integration tests
+  bring up their own Postgres via Testcontainers) and `local-infrastructure` running:
+  the rate-limit and cache integration tests use its Redis, and the `dev`-profile smoke
+  test (`InventoryApiApplicationTests`) uses its Postgres and Redis with the `inventory`
+  role/database from step 2 and `.env` loaded (step 4). See
+  [docs/conventions/testing.md](docs/conventions/testing.md).
 - `./mvnw install -DskipTests` - install all modules to the local repo (needed once after
   cloning, or after changing a module's `pom.xml`, so sibling-module dependencies resolve).
 - `./mvnw spring-boot:run -pl api -Dspring-boot.run.profiles=dev` - run the app.
@@ -108,7 +111,7 @@ From the repo root (acts on all four modules: `domain`, `application`, `infrastr
 ```
 inventory-api/
   domain/          # business entities, value objects, repository interfaces
-  application/   # use cases, application-owned contracts - no Spring/JPA dependency
+  application/   # use cases, application-owned contracts - no JPA/web dependency
   infrastructure/ # Spring Data JPA, Redis, Flyway
   api/             # the only packaged/runnable module
   docs/            # architecture decisions, conventions, Spec Driven Development specs
