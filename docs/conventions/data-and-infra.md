@@ -35,6 +35,23 @@
 - Redis is a cache, not a system of record - every value it holds is rebuildable from
   Postgres. It also backs the two rate limiters (`RedisRateLimiter`) - see
   [docs/security.md](../security.md).
+- The caches that exist, and why only those, are decided in
+  [docs/specs/15-reference-data-caching/](../specs/15-reference-data-caching/requirements.md):
+  `findById` of products, warehouses and categories, cached on the repository adapters in
+  `infrastructure` (never on `application` services). Names and the key prefix live in
+  `CacheNames`; a cache not declared in `RedisCacheConfig` cannot be created, so a new one
+  always comes with its own TTL (`app.cache.ttl.*`). Adding one is a spec decision, not a
+  drive-by `@Cacheable`.
+- Every write evicts its entry **after commit** (transaction-aware manager), never caches
+  a miss, and **fails open**: `FailOpenCache` turns any Redis error into a miss or a
+  skipped write, so Redis being down never fails a request Postgres can answer.
+- Inside one transaction, never re-read an entity with `findById` after `save`-ing it -
+  the eviction is deferred to commit, so the read would return the cached pre-write value.
+  Use what `save` returns.
+- Cached values are JSON via one typed serializer per cache with a strict mapper - an entry
+  whose shape no longer matches its class is reloaded, not read with a defaulted field.
+  Bump the `vN` segment of `CacheNames.KEY_PREFIX` if a change must invalidate every
+  existing entry at deploy time.
 
 ## Security practices
 

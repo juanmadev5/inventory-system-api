@@ -14,7 +14,9 @@ JUnit 5 + Mockito + AssertJ (`spring-boot-starter-test`), plus each feature-spec
 (`LoginRateLimitIntegrationTest`/`ApiRateLimitIntegrationTest`) are the one deliberate
 exception - they need a real `INCR`/`EXPIRE` round trip against the shared
 `local-infrastructure` Redis instance, since Testcontainers has no equivalent module worth
-the overhead for that.
+the overhead for that. `ReferenceDataCachingIntegrationTest` makes the same exception for
+the Redis cache (`spring.cache.type=redis`); every other `@SpringBootTest` sets
+`spring.cache.type=simple`, so its results never depend on what a dev run left in Redis.
 
 ## Structure
 

@@ -77,6 +77,9 @@ Implemented so far:
 - [docs/specs/14-webhooks/](docs/specs/14-webhooks/requirements.md) - platform-level:
   transactional outbox + scheduled dispatcher for four event types, never a synchronous HTTP
   call from a business request.
+- [docs/specs/15-reference-data-caching/](docs/specs/15-reference-data-caching/requirements.md) -
+  platform-level: Redis cache for product/warehouse/category `findById` only, evicted after
+  commit, fails open. No HTTP contract change.
 
 The whole domain in [docs/specs/00-domain-overview.md](docs/specs/00-domain-overview.md) is
 implemented as of `10-reporting`, including the sales-orders/cycle-counts extensions `08`/`09`

@@ -66,6 +66,14 @@ app:
     # allowed cross-origin until a real frontend origin is set.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
 
+  cache:
+    # Reference-data caches - see docs/specs/15-reference-data-caching/requirements.md.
+    # Entries are evicted on every write; the TTL only bounds a rare read/write race.
+    ttl:
+      products: ${CACHE_TTL_PRODUCTS:10m}
+      warehouses: ${CACHE_TTL_WAREHOUSES:10m}
+      categories: ${CACHE_TTL_CATEGORIES:10m}
+
   webhooks:
     # See docs/specs/14-webhooks/requirements.md's "Decision" - the dispatcher is a
     # @Scheduled background job, never anything a business-endpoint request waits on.

@@ -7,8 +7,11 @@ import com.jm.inventory.domain.common.PagedResult;
 import com.jm.inventory.infrastructure.catalog.persistence.CategoryJpaEntity;
 import com.jm.inventory.infrastructure.catalog.persistence.CategorySpecifications;
 import com.jm.inventory.infrastructure.catalog.persistence.CategorySpringDataRepository;
+import com.jm.inventory.infrastructure.platform.cache.CacheNames;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +29,7 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.CATEGORIES_BY_ID, key = "#category.id")
     public Category save(Category category) {
         CategoryJpaEntity entity = springDataRepository.findById(category.getId())
                 .map(existing -> applyTo(existing, category))
@@ -34,6 +38,7 @@ public class CategoryRepositoryAdapter implements CategoryRepository {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.CATEGORIES_BY_ID, key = "#id", unless = "#result == null")
     public Optional<Category> findById(UUID id) {
         return springDataRepository.findById(id).map(this::toDomain);
     }
