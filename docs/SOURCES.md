@@ -93,6 +93,21 @@ Confirmed by inspecting the resolved jars, for the "every error has a `code`" fi
   `1.21.4` line (confirmed via each artifact's own `maven-metadata.xml`). Pinned directly,
   not via that BOM.
 
+## Dependency vulnerability scan (2026-11-05)
+
+- Every resolved dependency (`mvn compile dependency:list -DincludeScope=test`, all four
+  modules, 210 artifacts) was checked against [OSV](https://osv.dev) (`api.osv.dev`), and
+  the repo and built image with Trivy 0.76.2 (`trivy fs .`, `trivy image`).
+- Spring Boot `4.1.1` -> `4.1.2` (`spring-boot-dependencies-4.1.2.pom` on Maven Central):
+  its BOM moves `tomcat.version` 11.0.24 -> 11.0.27 (4 critical CVEs fixed in 11.0.25),
+  `jackson-bom.version` 3.1.5 -> 3.1.7 and `jackson-2-bom.version` 2.21.5 -> 2.21.7 (7
+  high/moderate CVEs each; Jackson 2 comes in through springdoc's `swagger-core`).
+- `commons-compress` pinned to `1.28.0` in `api/pom.xml`: Testcontainers `1.21.4` (test
+  scope only) pulls `1.24.0` (CVE-2024-25710, CVE-2024-26308, fixed in `1.26.0`), and
+  Spring Boot's BOM does not manage it.
+- Result: 0 known vulnerabilities in the dependencies, the repo, the Alpine base and the
+  shipped jar.
+
 ## Spring Security Test - mocking a JWT
 
 - `SecurityMockMvcRequestPostProcessors.jwt()` (`spring-security-test`, pulled transitively
