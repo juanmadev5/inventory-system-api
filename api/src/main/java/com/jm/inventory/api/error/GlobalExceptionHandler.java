@@ -45,7 +45,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatus.NOT_FOUND, ErrorCode.ENDPOINT_NOT_FOUND,
             HttpStatus.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED,
             HttpStatus.NOT_ACCEPTABLE, ErrorCode.NOT_ACCEPTABLE,
-            HttpStatus.PAYLOAD_TOO_LARGE, ErrorCode.PAYLOAD_TOO_LARGE,
+            HttpStatus.CONTENT_TOO_LARGE, ErrorCode.CONTENT_TOO_LARGE,
             HttpStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.UNSUPPORTED_MEDIA_TYPE);
 
     @ExceptionHandler(InvalidCredentialsException.class)
@@ -81,7 +81,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(InvalidReferenceException.class)
     public ProblemDetail handleInvalidReference(InvalidReferenceException ex) {
-        return validationFailed(HttpStatus.UNPROCESSABLE_ENTITY, List.of(new FieldError(ex.field(), ex.getMessage())));
+        return validationFailed(HttpStatus.UNPROCESSABLE_CONTENT, List.of(new FieldError(ex.field(), ex.getMessage())));
     }
 
     @ExceptionHandler(Exception.class)
